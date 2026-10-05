@@ -1,25 +1,21 @@
-name: Sync ReSukiSU CI Builds
-
+name: Sync BakaSU CI Builds
 on:
   schedule:
     - cron: '0 */8 * * *'
   workflow_dispatch: 
-
 env:
   # 可以在这里手动设置需要检查的最新 N 条 Action 数量
   N_LATEST_RUNS: 50 
-  TARGET_REPO: ReSukiSU/ReSukiSU
-
+  # ==========修正：源站为 Baka‑SU/BakaSU==========
+  TARGET_REPO: Baka-SU/BakaSU
 jobs:
   fetch-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Process Artifacts and Publish Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,7 +28,7 @@ jobs:
               run_id=$(echo "$run" | jq -r '.id')
               run_title=$(echo "$run" | jq -r '.title')
               run_url=$(echo "$run" | jq -r '.url')
-              tag_name="ReSukiSU_${run_id}"
+              tag_name="BakaSU_${run_id}"
               
               echo "----------------------------------------"
               echo "Checking run ID: $run_id (Title: $run_title)"
@@ -46,7 +42,7 @@ jobs:
               # 获取该 run 的所有工件列表
               artifacts_json=$(gh api repos/$TARGET_REPO/actions/runs/$run_id/artifacts)
               
-              # 1. 确认是否包含名为 Manager-release 的工件
+              # 1. 确认是否包含名为 Manager‑release 的工件
               if echo "$artifacts_json" | jq -e '.artifacts[] | select(.name == "Manager-release")' > /dev/null; then
                   echo "✅ Found Manager-release. Proceeding to download artifacts..."
                   
@@ -87,8 +83,7 @@ jobs:
                       rm -rf apk
                   fi
                   
-                  # 打包所有 .ko 文件为 lkm-all.zip，并删除原文件
-                  # 使用数组收集 .ko 文件，避免在没有 .ko 文件时报错
+                  # 将所有 .ko 文件打包为 lkm-all.zip，并删除原文件
                   ko_files=(*.ko)
                   if [ ${#ko_files[@]} -gt 0 ] && [ "${ko_files[0]}" != "*.ko" ]; then
                       echo "   -> 🗜️ Zipping ${#ko_files[@]} .ko files into lkm-all.zip..."
@@ -99,19 +94,16 @@ jobs:
                       echo "   -> ℹ️ No .ko files found to zip."
                   fi
                   
-                  # 检索目标 apk 文件并提取五位版本号
-                  # 使用正则匹配形如 ReSukiSU_*_?????-*.apk 的文件
-                  apk_file=$(find . -maxdepth 1 -name "ReSukiSU*_[0-9][0-9][0-9][0-9][0-9]-*.apk" | head -n 1)
+                  # 检索目标 apk 文件并提取五位版本号（BakaSU前缀）
+                  apk_file=$(find . -maxdepth 1 -name "BakaSU_*_[0-9][0-9][0-9][0-9][0-9]-*.apk" | head -n 1)
                   
                   if [ -n "$apk_file" ]; then
-                      # 提取连续的5位数字
                       if [[ "$apk_file" =~ _([0-9]{5})-.*\.apk$ ]]; then
                           five_digits="${BASH_REMATCH[1]}"
                           release_name="v${five_digits}"
                           
-                          echo "🎉 Preparing to publish release: $release_name with tag: $tag_name"
+                          echo "🎉 Preparing to publish BakaSU release: $release_name with tag: $tag_name"
                           
-                          # 将当前文件夹下的所有文件收集为 release 资产
                           assets=()
                           for file in *; do
                               if [ -f "$file" ]; then
@@ -119,7 +111,6 @@ jobs:
                               fi
                           done
                           
-                          # 发布 Release
                           if [ ${#assets[@]} -gt 0 ]; then
                               release_notes=$(printf "%s\n\n**原始 Action 链接:** %s" "$run_title" "$run_url")
                               gh release create "$tag_name" "${assets[@]}" --title "$release_name" --notes "$release_notes"
@@ -131,14 +122,13 @@ jobs:
                           echo "❌ Could not extract 5 digits from filename: $apk_file"
                       fi
                   else
-                      echo "❌ Required APK pattern (ReSukiSU_*_XXXXX-universal-release.apk) not found. Skipping release."
+                      echo "❌ Required APK pattern (BakaSU_*_XXXXX-universal-release.apk) not found. Skipping release."
                   fi
                   
-                  # 退出文件夹并清理，以免影响下一个循环
                   cd ..
                   rm -rf "$run_id"
               else
-                  echo "⏭️ No Manager-release artifact found in run $run_id. Skipping."
+                  echo "⏭️ No Manager‑release artifact found in run $run_id. Skipping."
               fi
           done
           echo "All done!"
